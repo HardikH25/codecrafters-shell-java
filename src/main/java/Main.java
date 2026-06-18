@@ -29,11 +29,9 @@ public class Main {
             } else if (command.equals("cd")) {
                 String target = tokens[1];
                 
-                // handle the Home Directory
                 if (target.equals("~")) {
                     currentDir = Paths.get(System.getenv("HOME"));
                 } else {
-                    // Handle absolute and relative paths
                     Path newPath = currentDir.resolve(target).normalize();
                     
                     if (new File(newPath.toString()).isDirectory()) {
@@ -73,7 +71,9 @@ public class Main {
                     pb.inheritIO(); 
                     Process process = pb.start();
                     process.waitFor();
-                } catch (Exception e)
+                } catch (Exception e) {
+                    System.out.println(command + ": command not found");
+                }
             }
         }
     }
