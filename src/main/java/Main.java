@@ -2,6 +2,7 @@ import java.util.Scanner;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -66,6 +67,14 @@ public class Main {
         return tokens.toArray(new String[0]);
     }
 
+    public static void printOut(String text, String outFile) throws Exception {
+        if (outFile != null) {
+            Files.writeString(Paths.get(outFile), text + "\n");
+        } else {
+            System.out.println(text);
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
         Path currentDir = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
@@ -76,7 +85,30 @@ public class Main {
             
             if (input == null || input.trim().isEmpty()) continue;
 
-            String[] tokens = parseInput(input.trim());
+            String[] rawTokens = parseInput(input.trim());
+            if (rawTokens.length == 0) continue;
+
+            String outFile = null;
+            int opIdx = -1;
+            
+            for (int i = 0; i < rawTokens.length; i++) {
+                if (rawTokens[i].equals(">") || rawTokens[i].equals("1>")) {
+                    if (i + 1 < rawTokens.length) {
+                        outFile = rawTokens[i + 1];
+                        opIdx = i;
+                    }
+                    break;
+                }
+            }
+
+            String[] tokens;
+            if (opIdx != -1) {
+                tokens = new String[opIdx];
+                System.arraycopy(rawTokens, 0, tokens, 0, opIdx);
+            } else {
+                tokens = rawTokens;
+            }
+
             if (tokens.length == 0) continue;
             String command = tokens[0];
             
@@ -91,10 +123,10 @@ public class Main {
                         echoOutput.append(" ");
                     }
                 }
-                System.out.println(echoOutput.toString());
+                printOut(echoOutput.toString(), outFile);
                 
             } else if (command.equals("pwd")) {
-                System.out.println(currentDir.toString());
+                printOut(currentDir.toString(), outFile);
                 
             } else if (command.equals("cd")) {
                 String target = tokens.length > 1 ? tokens[1] : "";
@@ -103,7 +135,6 @@ public class Main {
                     currentDir = Paths.get(System.getenv("HOME"));
                 } else {
                     Path newPath = currentDir.resolve(target).normalize();
-                    
                     if (new File(newPath.toString()).isDirectory()) {
                         currentDir = newPath;
                     } else {
@@ -114,7 +145,7 @@ public class Main {
             } else if (command.equals("type")) {
                 String target = tokens.length > 1 ? tokens[1] : "";
                 if (target.equals("echo") || target.equals("exit") || target.equals("type") || target.equals("pwd") || target.equals("cd")) {
-                    System.out.println(target + " is a shell builtin");
+                    printOut(target + " is a shell builtin", outFile);
                 } else {
                     String pathEnv = System.getenv("PATH");
                     boolean found = false;
@@ -123,14 +154,14 @@ public class Main {
                         for (String dir : directories) {
                             File file = new File(dir, target);
                             if (file.exists() && file.canExecute()) {
-                                System.out.println(target + " is " + file.getAbsolutePath());
+                                printOut(target + " is " + file.getAbsolutePath(), outFile);
                                 found = true;
                                 break; 
                             }
                         }
                     }
                     if (!found) {
-                        System.out.println(target + ": not found");
+                        printOut(target + ": not found", outFile);
                     }
                 }
                 
@@ -138,7 +169,13 @@ public class Main {
                 try {
                     ProcessBuilder pb = new ProcessBuilder(tokens);
                     pb.directory(new File(currentDir.toString())); 
-                    pb.inheritIO(); 
+                    
+                    if (outFile != null) {
+                        pb.redirectOutput(new File(outFile));
+                    } else {
+                        pb.inheritIO();
+                    }
+                    
                     Process process = pb.start();
                     process.waitFor();
                 } catch (Exception e) {
