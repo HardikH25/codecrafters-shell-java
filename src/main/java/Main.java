@@ -1,5 +1,5 @@
 import java.util.Scanner;
-import java.io.File; // We need this to check if files exist
+import java.io.File;
 
 public class Main {
     public static void main(String[] args) throws Exception {
@@ -26,30 +26,42 @@ public class Main {
                 if (target.equals("echo") || target.equals("exit") || target.equals("type")) {
                     System.out.println(target + " is a shell builtin");
                 } else {
-                    String pathEnv = System.getenv("PATH"); //list of folders
+                    String pathEnv = System.getenv("PATH");
                     boolean found = false;
-                    
                     if (pathEnv != null) {
                         String[] directories = pathEnv.split(":"); 
-                        
                         for (String dir : directories) {
                             File file = new File(dir, target);
-                            
                             if (file.exists() && file.canExecute()) {
                                 System.out.println(target + " is " + file.getAbsolutePath());
                                 found = true;
-                                break;
+                                break; 
                             }
                         }
                     }
-                    
                     if (!found) {
                         System.out.println(target + ": not found");
                     }
                 }
                 
             } else {
-                System.out.println(command + ": command not found");
+                //run external program
+                try {
+                    // ProcessBuilder automatically takes the array of words (tokens)
+                    // and asks the OS to run the first word as a program, passing the rest as arguments.
+                    ProcessBuilder pb = new ProcessBuilder(tokens);
+                    
+                    // inheritIO() is CRUCIAL. It tells the OS: "Let this new program use my shell's screen to print its output."
+                    pb.inheritIO(); 
+                    
+                    // Start the program and pause our shell until the program finishes
+                    Process process = pb.start();
+                    process.waitFor();
+                    
+                } catch (Exception e) {
+                    // If the OS throws an error (e.g., it can't find the program), print not found
+                    System.out.println(command + ": command not found");
+                }
             }
         }
     }
