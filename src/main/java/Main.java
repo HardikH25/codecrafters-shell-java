@@ -6,24 +6,27 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Main {
-        public static String[] parseInput(String input) {
+    
+    public static String[] parseInput(String input) {
         List<String> tokens = new ArrayList<>();
         StringBuilder currentToken = new StringBuilder();
         boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
         boolean inToken = false;
 
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
 
-            if (c == '\'') {
-                // If we see a quote, toggle our "inside quote" state
-                inSingleQuote = !inSingleQuote; 
-                inToken = true; 
-            } else if (Character.isWhitespace(c) && !inSingleQuote) {
-                // If we see a space AND we are NOT inside a quote, finish the word!
+            if (c == '\'' && !inDoubleQuote) {
+                inSingleQuote = !inSingleQuote;
+                inToken = true;
+            } else if (c == '"' && !inSingleQuote) {
+                inDoubleQuote = !inDoubleQuote;
+                inToken = true;
+            } else if (Character.isWhitespace(c) && !inSingleQuote && !inDoubleQuote) {
                 if (inToken) {
                     tokens.add(currentToken.toString());
-                    currentToken.setLength(0); // Clear the builder for the next word
+                    currentToken.setLength(0);
                     inToken = false;
                 }
             } else {
@@ -31,7 +34,7 @@ public class Main {
                 inToken = true;
             }
         }
-        // Add the very last word if there is one
+        
         if (inToken) {
             tokens.add(currentToken.toString());
         }
