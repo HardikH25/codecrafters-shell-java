@@ -13,16 +13,18 @@ public class Main {
         int id;
         Process process;
         String command;
+        long launchSequence; // Tracks true chronological order for + and - markers
 
-        public Job(int id, Process process, String command) {
+        public Job(int id, Process process, String command, long launchSequence) {
             this.id = id;
             this.process = process;
             this.command = command;
+            this.launchSequence = launchSequence;
         }
     }
 
     static List<Job> backgroundJobs = new ArrayList<>();
-    static int nextJobId = 1;
+    static long seqCounter = 0; // Replaces nextJobId to track absolute launch order
     
     public static String[] parseInput(String input) {
         List<String> tokens = new ArrayList<>();
@@ -97,15 +99,30 @@ public class Main {
     }
 
     public static void checkBackgroundJobs(boolean isJobsCommand, String outFile, boolean appendOut) throws Exception {
+        // Find the most recent (+) and second most recent (-) jobs based on true sequence
+        Job plusJob = null;
+        Job minusJob = null;
+        long maxSeq = -1;
+        long secondMaxSeq = -1;
+
+        for (Job j : backgroundJobs) {
+            if (j.launchSequence > maxSeq) {
+                secondMaxSeq = maxSeq;
+                minusJob = plusJob;
+                maxSeq = j.launchSequence;
+                plusJob = j;
+            } else if (j.launchSequence > secondMaxSeq) {
+                secondMaxSeq = j.launchSequence;
+                minusJob = j;
+            }
+        }
+
         List<Job> toRemove = new ArrayList<>();
         for (int i = 0; i < backgroundJobs.size(); i++) {
             Job job = backgroundJobs.get(i);
             char marker = ' ';
-            if (i == backgroundJobs.size() - 1) {
-                marker = '+';
-            } else if (i == backgroundJobs.size() - 2) {
-                marker = '-';
-            }
+            if (job == plusJob) marker = '+';
+            else if (job == minusJob) marker = '-';
             
             if (job.process.isAlive()) {
                 if (isJobsCommand) {
@@ -302,9 +319,25 @@ public class Main {
                     Process process = pb.start();
                     
                     if (isBackground) {
-                        System.out.println("[" + nextJobId + "] " + process.pid());
-                        backgroundJobs.add(new Job(nextJobId, process, fullCommand));
-                        nextJobId++;
+                        // Find the smallest available ID
+                        int newJobId = 1;
+                        while (true) {
+                            boolean found = false;
+                            for (Job j : backgroundJobs) {
+                                if (j.id == newJobId) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) break; // We found a gap!
+                            newJobId++;
+                        }
+                        
+                        System.out.println("[" + newJobId + "] " + process.pid());
+                        backgroundJobs.add(new Job(newJobId, process, fullCommand, seqCounter++));
+                        
+                        // Keep the list sorted by ID so jobs command prints them in order!
+                        backgroundJobs.sort((a, b) -> a.id - b.id);
                     } else {
                         process.waitFor();
                     }
