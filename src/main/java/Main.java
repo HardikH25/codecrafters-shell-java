@@ -2,8 +2,43 @@ import java.util.Scanner;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Main {
+        public static String[] parseInput(String input) {
+        List<String> tokens = new ArrayList<>();
+        StringBuilder currentToken = new StringBuilder();
+        boolean inSingleQuote = false;
+        boolean inToken = false;
+
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+
+            if (c == '\'') {
+                // If we see a quote, toggle our "inside quote" state
+                inSingleQuote = !inSingleQuote; 
+                inToken = true; 
+            } else if (Character.isWhitespace(c) && !inSingleQuote) {
+                // If we see a space AND we are NOT inside a quote, finish the word!
+                if (inToken) {
+                    tokens.add(currentToken.toString());
+                    currentToken.setLength(0); // Clear the builder for the next word
+                    inToken = false;
+                }
+            } else {
+                currentToken.append(c);
+                inToken = true;
+            }
+        }
+        // Add the very last word if there is one
+        if (inToken) {
+            tokens.add(currentToken.toString());
+        }
+        
+        return tokens.toArray(new String[0]);
+    }
+
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
         Path currentDir = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
@@ -14,20 +49,28 @@ public class Main {
             
             if (input == null || input.trim().isEmpty()) continue;
 
-            String[] tokens = input.trim().split("\\s+");
+            String[] tokens = parseInput(input.trim());
+            if (tokens.length == 0) continue;
             String command = tokens[0];
             
             if (command.equals("exit")) {
                 break;
                 
-            } else if (input.startsWith("echo ")) {
-                System.out.println(input.substring(5));
+            } else if (command.equals("echo")) {
+                StringBuilder echoOutput = new StringBuilder();
+                for (int i = 1; i < tokens.length; i++) {
+                    echoOutput.append(tokens[i]);
+                    if (i < tokens.length - 1) {
+                        echoOutput.append(" ");
+                    }
+                }
+                System.out.println(echoOutput.toString());
                 
             } else if (command.equals("pwd")) {
                 System.out.println(currentDir.toString());
                 
             } else if (command.equals("cd")) {
-                String target = tokens[1];
+                String target = tokens.length > 1 ? tokens[1] : "";
                 
                 if (target.equals("~")) {
                     currentDir = Paths.get(System.getenv("HOME"));
@@ -42,7 +85,7 @@ public class Main {
                 }
                 
             } else if (command.equals("type")) {
-                String target = tokens[1];
+                String target = tokens.length > 1 ? tokens[1] : "";
                 if (target.equals("echo") || target.equals("exit") || target.equals("type") || target.equals("pwd") || target.equals("cd")) {
                     System.out.println(target + " is a shell builtin");
                 } else {
