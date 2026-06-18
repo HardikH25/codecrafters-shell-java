@@ -96,11 +96,48 @@ public class Main {
         }
     }
 
+    public static void checkBackgroundJobs(boolean isJobsCommand, String outFile, boolean appendOut) throws Exception {
+        List<Job> toRemove = new ArrayList<>();
+        for (int i = 0; i < backgroundJobs.size(); i++) {
+            Job job = backgroundJobs.get(i);
+            char marker = ' ';
+            if (i == backgroundJobs.size() - 1) {
+                marker = '+';
+            } else if (i == backgroundJobs.size() - 2) {
+                marker = '-';
+            }
+            
+            if (job.process.isAlive()) {
+                if (isJobsCommand) {
+                    String output = String.format("[%d]%c  Running                 %s", job.id, marker, job.command);
+                    printOut(output, outFile, appendOut);
+                }
+            } else {
+                String doneCmd = job.command;
+                if (doneCmd.endsWith(" &")) {
+                    doneCmd = doneCmd.substring(0, doneCmd.length() - 2);
+                } else if (doneCmd.endsWith("&")) {
+                    doneCmd = doneCmd.substring(0, doneCmd.length() - 1);
+                }
+                String output = String.format("[%d]%c  Done                    %s", job.id, marker, doneCmd);
+                if (isJobsCommand) {
+                    printOut(output, outFile, appendOut);
+                } else {
+                    System.out.println(output);
+                }
+                toRemove.add(job);
+            }
+        }
+        backgroundJobs.removeAll(toRemove);
+    }
+
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
         Path currentDir = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
         
         while (true) {
+            checkBackgroundJobs(false, null, false);
+            
             System.out.print("$ ");
             String input = scanner.nextLine();
             
@@ -183,32 +220,7 @@ public class Main {
                 break;
                 
             } else if (command.equals("jobs")) {
-                List<Job> toRemove = new ArrayList<>();
-                for (int i = 0; i < backgroundJobs.size(); i++) {
-                    Job job = backgroundJobs.get(i);
-                    char marker = ' ';
-                    if (i == backgroundJobs.size() - 1) {
-                        marker = '+';
-                    } else if (i == backgroundJobs.size() - 2) {
-                        marker = '-';
-                    }
-                    
-                    if (job.process.isAlive()) {
-                        String output = String.format("[%d]%c  Running                 %s", job.id, marker, job.command);
-                        printOut(output, outFile, appendOut);
-                    } else {
-                        String doneCmd = job.command;
-                        if (doneCmd.endsWith(" &")) {
-                            doneCmd = doneCmd.substring(0, doneCmd.length() - 2);
-                        } else if (doneCmd.endsWith("&")) {
-                            doneCmd = doneCmd.substring(0, doneCmd.length() - 1);
-                        }
-                        String output = String.format("[%d]%c  Done                    %s", job.id, marker, doneCmd);
-                        printOut(output, outFile, appendOut);
-                        toRemove.add(job);
-                    }
-                }
-                backgroundJobs.removeAll(toRemove);
+                checkBackgroundJobs(true, outFile, appendOut);
                 
             } else if (command.equals("echo")) {
                 StringBuilder echoOutput = new StringBuilder();
