@@ -141,7 +141,8 @@ public class Main {
             if (tokens.length == 0) continue;
             String command = tokens[0];
             
-            boolean isBuiltin = command.equals("exit") || command.equals("echo") || command.equals("pwd") || command.equals("cd") || command.equals("type");
+            // --- ADDED JOBS HERE ---
+            boolean isBuiltin = command.equals("exit") || command.equals("echo") || command.equals("pwd") || command.equals("cd") || command.equals("type") || command.equals("jobs");
             
             if (isBuiltin && errFile != null) {
                 new File(errFile).getParentFile().mkdirs();
@@ -154,6 +155,10 @@ public class Main {
             
             if (command.equals("exit")) {
                 break;
+                
+            } else if (command.equals("jobs")) {
+                // --- NEW: Empty implementation for jobs ---
+                // Does absolutely nothing right now!
                 
             } else if (command.equals("echo")) {
                 StringBuilder echoOutput = new StringBuilder();
@@ -184,7 +189,8 @@ public class Main {
                 
             } else if (command.equals("type")) {
                 String target = tokens.length > 1 ? tokens[1] : "";
-                if (target.equals("echo") || target.equals("exit") || target.equals("type") || target.equals("pwd") || target.equals("cd")) {
+                // --- ADDED JOBS HERE ---
+                if (target.equals("echo") || target.equals("exit") || target.equals("type") || target.equals("pwd") || target.equals("cd") || target.equals("jobs")) {
                     printOut(target + " is a shell builtin", outFile, appendOut);
                 } else {
                     String pathEnv = System.getenv("PATH");
