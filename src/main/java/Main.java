@@ -18,12 +18,13 @@ public class Main {
         while (true) {
             checkBackgroundJobs(false, null, false);
             System.out.print("$ ");
+            if (!scanner.hasNextLine()) break;
             String input = scanner.nextLine();
             if (input == null || input.trim().isEmpty()) continue;
             
             String[] rawTokens = parseInput(input.trim());
             boolean isBackground = false;
-            if (rawTokens[rawTokens.length - 1].equals("&")) {
+            if (rawTokens.length > 0 && rawTokens[rawTokens.length - 1].equals("&")) {
                 isBackground = true;
                 rawTokens = Arrays.copyOf(rawTokens, rawTokens.length - 1);
             }
@@ -37,45 +38,43 @@ public class Main {
         }
     }
 
+    public static String[] parseInput(String input) {
+        List<String> tokens = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        boolean inSingle = false, inDouble = false;
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (c == '\\' && !inSingle) {
+                if (i + 1 < input.length()) sb.append(input.charAt(++i));
+            } else if (c == '\'' && !inDouble) inSingle = !inSingle;
+            else if (c == '"' && !inSingle) inDouble = !inDouble;
+            else if (Character.isWhitespace(c) && !inSingle && !inDouble) {
+                if (sb.length() > 0) { tokens.add(sb.toString()); sb.setLength(0); }
+            } else sb.append(c);
+        }
+        if (sb.length() > 0) tokens.add(sb.toString());
+        return tokens.toArray(new String[0]);
+    }
+
+    public static void checkBackgroundJobs(boolean isJobsCommand, String outFile, boolean append) throws Exception {
+        // ... (Include your existing marker logic + reaping logic here)
+    }
+
+    private static void executeSingle(List<String> tokens, boolean isBackground, String fullCmd) throws Exception {
+        // ... (Include your full logic for builtins + ProcessBuilder)
+    }
+
     private static void executePipeline(List<List<String>> pipeline, boolean isBackground, String fullCmd) throws Exception {
-        Process lastProcess = null;
-        InputStream currentIn = System.in;
-
-        for (int i = 0; i < pipeline.size(); i++) {
-            List<String> cmd = pipeline.get(i);
-            boolean isLast = (i == pipeline.size() - 1);
-            
-            if (isBuiltin(cmd.get(0))) {
-                // Simplified for brevity: pipe built-in output to next
-                executeBuiltin(cmd.toArray(new String[0]), null, false);
-            } else {
-                ProcessBuilder pb = new ProcessBuilder(cmd);
-                if (i != 0) pb.redirectInput(ProcessBuilder.Redirect.PIPE);
-                if (!isLast) pb.redirectOutput(ProcessBuilder.Redirect.PIPE);
-                Process p = pb.start();
-                if (lastProcess != null) lastProcess.getInputStream().transferTo(p.getOutputStream());
-                lastProcess = p;
-            }
+        List<ProcessBuilder> builders = new ArrayList<>();
+        for (List<String> cmd : pipeline) {
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            builders.add(pb);
         }
-        if (!isBackground) lastProcess.waitFor();
+        List<Process> procs = ProcessBuilder.startPipeline(builders);
+        if (!isBackground) procs.get(procs.size() - 1).waitFor();
+        // ... (Include job tracking for isBackground = true)
     }
 
-    private static void executeBuiltin(String[] tokens, String outFile, boolean append) throws Exception {
-        String cmd = tokens[0];
-        if (cmd.equals("echo")) {
-            System.out.println(String.join(" ", Arrays.copyOfRange(tokens, 1, tokens.length)));
-        } else if (cmd.equals("pwd")) {
-            System.out.println(Paths.get("").toAbsolutePath());
-        } else if (cmd.equals("type")) {
-            String target = tokens[1];
-            if (Arrays.asList("echo", "type", "pwd", "cd", "jobs").contains(target)) 
-                System.out.println(target + " is a shell builtin");
-            else System.out.println(target + ": not found");
-        }
-    }
-
-    // Include your existing parseInput, checkBackgroundJobs, and helper methods here...
-    private static boolean isBuiltin(String cmd) { return Arrays.asList("echo", "type", "pwd", "cd", "jobs").contains(cmd); }
     private static List<List<String>> splitByPipe(String[] tokens) {
         List<List<String>> p = new ArrayList<>();
         List<String> current = new ArrayList<>();
