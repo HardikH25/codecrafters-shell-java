@@ -97,6 +97,7 @@ public class Main {
             String outFile = null;
             String errFile = null;
             boolean appendOut = false;
+            boolean appendErr = false;
             int opIdx = -1;
             
             for (int i = 0; i < rawTokens.length; i++) {
@@ -119,6 +120,13 @@ public class Main {
                         opIdx = i;
                     }
                     break;
+                } else if (rawTokens[i].equals("2>>")) {
+                    if (i + 1 < rawTokens.length) {
+                        errFile = rawTokens[i + 1];
+                        appendErr = true;
+                        opIdx = i;
+                    }
+                    break;
                 }
             }
 
@@ -137,7 +145,11 @@ public class Main {
             
             if (isBuiltin && errFile != null) {
                 new File(errFile).getParentFile().mkdirs();
-                Files.writeString(Paths.get(errFile), "");
+                if (appendErr) {
+                    Files.writeString(Paths.get(errFile), "", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                } else {
+                    Files.writeString(Paths.get(errFile), "", StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                }
             }
             
             if (command.equals("exit")) {
@@ -213,7 +225,11 @@ public class Main {
                     if (errFile != null) {
                         File err = new File(errFile);
                         err.getParentFile().mkdirs();
-                        pb.redirectError(err);
+                        if (appendErr) {
+                            pb.redirectError(ProcessBuilder.Redirect.appendTo(err));
+                        } else {
+                            pb.redirectError(err);
+                        }
                     }
                     
                     Process process = pb.start();
