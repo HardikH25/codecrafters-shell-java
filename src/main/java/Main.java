@@ -3,6 +3,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -67,10 +68,14 @@ public class Main {
         return tokens.toArray(new String[0]);
     }
 
-    public static void printOut(String text, String outFile) throws Exception {
+    public static void printOut(String text, String outFile, boolean append) throws Exception {
         if (outFile != null) {
             new File(outFile).getParentFile().mkdirs();
-            Files.writeString(Paths.get(outFile), text + "\n");
+            if (append) {
+                Files.writeString(Paths.get(outFile), text + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            } else {
+                Files.writeString(Paths.get(outFile), text + "\n", StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            }
         } else {
             System.out.println(text);
         }
@@ -91,12 +96,20 @@ public class Main {
 
             String outFile = null;
             String errFile = null;
+            boolean appendOut = false;
             int opIdx = -1;
             
             for (int i = 0; i < rawTokens.length; i++) {
                 if (rawTokens[i].equals(">") || rawTokens[i].equals("1>")) {
                     if (i + 1 < rawTokens.length) {
                         outFile = rawTokens[i + 1];
+                        opIdx = i;
+                    }
+                    break;
+                } else if (rawTokens[i].equals(">>") || rawTokens[i].equals("1>>")) {
+                    if (i + 1 < rawTokens.length) {
+                        outFile = rawTokens[i + 1];
+                        appendOut = true;
                         opIdx = i;
                     }
                     break;
@@ -138,10 +151,10 @@ public class Main {
                         echoOutput.append(" ");
                     }
                 }
-                printOut(echoOutput.toString(), outFile);
+                printOut(echoOutput.toString(), outFile, appendOut);
                 
             } else if (command.equals("pwd")) {
-                printOut(currentDir.toString(), outFile);
+                printOut(currentDir.toString(), outFile, appendOut);
                 
             } else if (command.equals("cd")) {
                 String target = tokens.length > 1 ? tokens[1] : "";
@@ -160,7 +173,7 @@ public class Main {
             } else if (command.equals("type")) {
                 String target = tokens.length > 1 ? tokens[1] : "";
                 if (target.equals("echo") || target.equals("exit") || target.equals("type") || target.equals("pwd") || target.equals("cd")) {
-                    printOut(target + " is a shell builtin", outFile);
+                    printOut(target + " is a shell builtin", outFile, appendOut);
                 } else {
                     String pathEnv = System.getenv("PATH");
                     boolean found = false;
@@ -169,14 +182,14 @@ public class Main {
                         for (String dir : directories) {
                             File file = new File(dir, target);
                             if (file.exists() && file.canExecute()) {
-                                printOut(target + " is " + file.getAbsolutePath(), outFile);
+                                printOut(target + " is " + file.getAbsolutePath(), outFile, appendOut);
                                 found = true;
                                 break; 
                             }
                         }
                     }
                     if (!found) {
-                        printOut(target + ": not found", outFile);
+                        printOut(target + ": not found", outFile, appendOut);
                     }
                 }
                 
@@ -190,7 +203,11 @@ public class Main {
                     if (outFile != null) {
                         File out = new File(outFile);
                         out.getParentFile().mkdirs();
-                        pb.redirectOutput(out);
+                        if (appendOut) {
+                            pb.redirectOutput(ProcessBuilder.Redirect.appendTo(out));
+                        } else {
+                            pb.redirectOutput(out);
+                        }
                     }
                     
                     if (errFile != null) {
