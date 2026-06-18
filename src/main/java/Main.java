@@ -17,11 +17,29 @@ public class Main {
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
 
-            if (c == '\\' && !inSingleQuote && !inDoubleQuote) {
-                if (i + 1 < input.length()) {
-                    currentToken.append(input.charAt(i + 1));
-                    i++;
+            if (c == '\\') {
+                if (inSingleQuote) {
+                    currentToken.append(c);
                     inToken = true;
+                } else if (inDoubleQuote) {
+                    if (i + 1 < input.length()) {
+                        char next = input.charAt(i + 1);
+                        if (next == '"' || next == '\\') {
+                            currentToken.append(next);
+                            i++;
+                        } else {
+                            currentToken.append(c);
+                        }
+                    } else {
+                        currentToken.append(c);
+                    }
+                    inToken = true;
+                } else {
+                    if (i + 1 < input.length()) {
+                        currentToken.append(input.charAt(i + 1));
+                        i++;
+                        inToken = true;
+                    }
                 }
             } else if (c == '\'' && !inDoubleQuote) {
                 inSingleQuote = !inSingleQuote;
