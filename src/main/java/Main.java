@@ -13,7 +13,7 @@ public class Main {
         int id;
         Process process;
         String command;
-        long launchSequence; // Tracks true chronological order for + and - markers
+        long launchSequence; 
 
         public Job(int id, Process process, String command, long launchSequence) {
             this.id = id;
@@ -24,7 +24,7 @@ public class Main {
     }
 
     static List<Job> backgroundJobs = new ArrayList<>();
-    static long seqCounter = 0; // Replaces nextJobId to track absolute launch order
+    static long seqCounter = 0; 
     
     public static String[] parseInput(String input) {
         List<String> tokens = new ArrayList<>();
@@ -99,7 +99,6 @@ public class Main {
     }
 
     public static void checkBackgroundJobs(boolean isJobsCommand, String outFile, boolean appendOut) throws Exception {
-        // Find the most recent (+) and second most recent (-) jobs based on true sequence
         Job plusJob = null;
         Job minusJob = null;
         long maxSeq = -1;
@@ -174,6 +173,69 @@ public class Main {
             }
             
             if (rawTokens.length == 0) continue;
+
+            // --- NEW: PIPELINE LOGIC ---
+            List<List<String>> pipelineCommands = new ArrayList<>();
+            List<String> currentCmd = new ArrayList<>();
+            for(String t : rawTokens) {
+                if(t.equals("|")) {
+                    pipelineCommands.add(currentCmd);
+                    currentCmd = new ArrayList<>();
+                } else {
+                    currentCmd.add(t);
+                }
+            }
+            pipelineCommands.add(currentCmd);
+
+            if (pipelineCommands.size() > 1) {
+                List<ProcessBuilder> builders = new ArrayList<>();
+                for (int i = 0; i < pipelineCommands.size(); i++) {
+                    ProcessBuilder pb = new ProcessBuilder(pipelineCommands.get(i));
+                    pb.directory(new File(currentDir.toString()));
+                    pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+                    
+                    // First process takes standard input, last process spits to terminal
+                    if (i == 0) {
+                        pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
+                    }
+                    if (i == pipelineCommands.size() - 1) {
+                        pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+                    }
+                    builders.add(pb);
+                }
+                
+                try {
+                    List<Process> processes = ProcessBuilder.startPipeline(builders);
+                    
+                    if (isBackground) {
+                        Process lastProcess = processes.get(processes.size() - 1);
+                        int newJobId = 1;
+                        while (true) {
+                            boolean found = false;
+                            for (Job j : backgroundJobs) {
+                                if (j.id == newJobId) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) break; 
+                            newJobId++;
+                        }
+                        
+                        System.out.println("[" + newJobId + "] " + lastProcess.pid());
+                        backgroundJobs.add(new Job(newJobId, lastProcess, fullCommand, seqCounter++));
+                        backgroundJobs.sort((a, b) -> a.id - b.id);
+                    } else {
+                        for (Process p : processes) {
+                            p.waitFor();
+                        }
+                    }
+                } catch (Exception e) {
+                    System.out.println("command not found");
+                }
+                continue; // Skip single command logic!
+            }
+            // --- END PIPELINE LOGIC ---
 
             String outFile = null;
             String errFile = null;
@@ -319,7 +381,6 @@ public class Main {
                     Process process = pb.start();
                     
                     if (isBackground) {
-                        // Find the smallest available ID
                         int newJobId = 1;
                         while (true) {
                             boolean found = false;
@@ -329,14 +390,12 @@ public class Main {
                                     break;
                                 }
                             }
-                            if (!found) break; // We found a gap!
+                            if (!found) break; 
                             newJobId++;
                         }
                         
                         System.out.println("[" + newJobId + "] " + process.pid());
                         backgroundJobs.add(new Job(newJobId, process, fullCommand, seqCounter++));
-                        
-                        // Keep the list sorted by ID so jobs command prints them in order!
                         backgroundJobs.sort((a, b) -> a.id - b.id);
                     } else {
                         process.waitFor();
