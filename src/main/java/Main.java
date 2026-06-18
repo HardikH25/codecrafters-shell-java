@@ -170,10 +170,10 @@ public class Main {
                     ProcessBuilder pb = new ProcessBuilder(tokens);
                     pb.directory(new File(currentDir.toString())); 
                     
+                    pb.inheritIO();
+                    
                     if (outFile != null) {
                         pb.redirectOutput(new File(outFile));
-                    } else {
-                        pb.inheritIO();
                     }
                     
                     Process process = pb.start();
