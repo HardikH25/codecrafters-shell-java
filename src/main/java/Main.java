@@ -183,11 +183,16 @@ public class Main {
                 break;
                 
             } else if (command.equals("jobs")) {
-                for (Job job : backgroundJobs) {
-                    if (job.process.isAlive()) {
-                        String output = String.format("[%d]+  Running                 %s", job.id, job.command);
-                        printOut(output, outFile, appendOut);
+                for (int i = 0; i < backgroundJobs.size(); i++) {
+                    Job job = backgroundJobs.get(i);
+                    char marker = ' ';
+                    if (i == backgroundJobs.size() - 1) {
+                        marker = '+';
+                    } else if (i == backgroundJobs.size() - 2) {
+                        marker = '-';
                     }
+                    String output = String.format("[%d]%c  Running                 %s", job.id, marker, job.command);
+                    printOut(output, outFile, appendOut);
                 }
                 
             } else if (command.equals("echo")) {
