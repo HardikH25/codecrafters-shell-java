@@ -27,17 +27,20 @@ public class Main {
                 System.out.println(currentDir.toString());
                 
             } else if (command.equals("cd")) {
-                //cd logic
                 String target = tokens[1];
                 
-                // Java's .resolve() handles absolute paths automatically.
-                // If 'target' starts with a '/', it ignores 'currentDir' entirely!
-                Path newPath = currentDir.resolve(target).normalize();
-                
-                if (new File(newPath.toString()).isDirectory()) {
-                    currentDir = newPath; // Update our location
+                // handle the Home Directory
+                if (target.equals("~")) {
+                    currentDir = Paths.get(System.getenv("HOME"));
                 } else {
-                    System.out.println("cd: " + target + ": No such file or directory");
+                    // Handle absolute and relative paths
+                    Path newPath = currentDir.resolve(target).normalize();
+                    
+                    if (new File(newPath.toString()).isDirectory()) {
+                        currentDir = newPath;
+                    } else {
+                        System.out.println("cd: " + target + ": No such file or directory");
+                    }
                 }
                 
             } else if (command.equals("type")) {
@@ -66,14 +69,11 @@ public class Main {
             } else {
                 try {
                     ProcessBuilder pb = new ProcessBuilder(tokens);
-                    // Pass the current directory to external programs
                     pb.directory(new File(currentDir.toString())); 
                     pb.inheritIO(); 
                     Process process = pb.start();
                     process.waitFor();
-                } catch (Exception e) {
-                    System.out.println(command + ": command not found");
-                }
+                } catch (Exception e)
             }
         }
     }
