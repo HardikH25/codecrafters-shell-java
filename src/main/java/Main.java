@@ -94,6 +94,16 @@ public class Main {
             String[] rawTokens = parseInput(input.trim());
             if (rawTokens.length == 0) continue;
 
+            boolean isBackground = false;
+            if (rawTokens[rawTokens.length - 1].equals("&")) {
+                isBackground = true;
+                String[] newRawTokens = new String[rawTokens.length - 1];
+                System.arraycopy(rawTokens, 0, newRawTokens, 0, rawTokens.length - 1);
+                rawTokens = newRawTokens;
+            }
+            
+            if (rawTokens.length == 0) continue;
+
             String outFile = null;
             String errFile = null;
             boolean appendOut = false;
@@ -141,7 +151,6 @@ public class Main {
             if (tokens.length == 0) continue;
             String command = tokens[0];
             
-            // --- ADDED JOBS HERE ---
             boolean isBuiltin = command.equals("exit") || command.equals("echo") || command.equals("pwd") || command.equals("cd") || command.equals("type") || command.equals("jobs");
             
             if (isBuiltin && errFile != null) {
@@ -157,8 +166,6 @@ public class Main {
                 break;
                 
             } else if (command.equals("jobs")) {
-                // --- NEW: Empty implementation for jobs ---
-                // Does absolutely nothing right now!
                 
             } else if (command.equals("echo")) {
                 StringBuilder echoOutput = new StringBuilder();
@@ -189,7 +196,6 @@ public class Main {
                 
             } else if (command.equals("type")) {
                 String target = tokens.length > 1 ? tokens[1] : "";
-                // --- ADDED JOBS HERE ---
                 if (target.equals("echo") || target.equals("exit") || target.equals("type") || target.equals("pwd") || target.equals("cd") || target.equals("jobs")) {
                     printOut(target + " is a shell builtin", outFile, appendOut);
                 } else {
@@ -239,7 +245,12 @@ public class Main {
                     }
                     
                     Process process = pb.start();
-                    process.waitFor();
+                    
+                    if (isBackground) {
+                        System.out.println("[1] " + process.pid());
+                    } else {
+                        process.waitFor();
+                    }
                 } catch (Exception e) {
                     System.out.println(command + ": command not found");
                 }
