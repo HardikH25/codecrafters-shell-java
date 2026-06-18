@@ -69,6 +69,7 @@ public class Main {
 
     public static void printOut(String text, String outFile) throws Exception {
         if (outFile != null) {
+            new File(outFile).getParentFile().mkdirs();
             Files.writeString(Paths.get(outFile), text + "\n");
         } else {
             System.out.println(text);
@@ -89,12 +90,19 @@ public class Main {
             if (rawTokens.length == 0) continue;
 
             String outFile = null;
+            String errFile = null;
             int opIdx = -1;
             
             for (int i = 0; i < rawTokens.length; i++) {
                 if (rawTokens[i].equals(">") || rawTokens[i].equals("1>")) {
                     if (i + 1 < rawTokens.length) {
                         outFile = rawTokens[i + 1];
+                        opIdx = i;
+                    }
+                    break;
+                } else if (rawTokens[i].equals("2>")) {
+                    if (i + 1 < rawTokens.length) {
+                        errFile = rawTokens[i + 1];
                         opIdx = i;
                     }
                     break;
@@ -111,6 +119,13 @@ public class Main {
 
             if (tokens.length == 0) continue;
             String command = tokens[0];
+            
+            boolean isBuiltin = command.equals("exit") || command.equals("echo") || command.equals("pwd") || command.equals("cd") || command.equals("type");
+            
+            if (isBuiltin && errFile != null) {
+                new File(errFile).getParentFile().mkdirs();
+                Files.writeString(Paths.get(errFile), "");
+            }
             
             if (command.equals("exit")) {
                 break;
@@ -173,7 +188,15 @@ public class Main {
                     pb.inheritIO();
                     
                     if (outFile != null) {
-                        pb.redirectOutput(new File(outFile));
+                        File out = new File(outFile);
+                        out.getParentFile().mkdirs();
+                        pb.redirectOutput(out);
+                    }
+                    
+                    if (errFile != null) {
+                        File err = new File(errFile);
+                        err.getParentFile().mkdirs();
+                        pb.redirectError(err);
                     }
                     
                     Process process = pb.start();
