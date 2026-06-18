@@ -6,9 +6,6 @@ import java.nio.file.Paths;
 public class Main {
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
-        
-        // Remember where our shell starts!
-        // System.getProperty("user.dir") gets the folder where you launched the program.
         Path currentDir = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
         
         while (true) {
@@ -27,14 +24,25 @@ public class Main {
                 System.out.println(input.substring(5));
                 
             } else if (command.equals("pwd")) {
-                // Print Working Directory
-                // print the variable we created at the top!
                 System.out.println(currentDir.toString());
+                
+            } else if (command.equals("cd")) {
+                //cd logic
+                String target = tokens[1];
+                
+                // Java's .resolve() handles absolute paths automatically.
+                // If 'target' starts with a '/', it ignores 'currentDir' entirely!
+                Path newPath = currentDir.resolve(target).normalize();
+                
+                if (new File(newPath.toString()).isDirectory()) {
+                    currentDir = newPath; // Update our location
+                } else {
+                    System.out.println("cd: " + target + ": No such file or directory");
+                }
                 
             } else if (command.equals("type")) {
                 String target = tokens[1];
-                //check buitlin
-                if (target.equals("echo") || target.equals("exit") || target.equals("type") || target.equals("pwd")) {
+                if (target.equals("echo") || target.equals("exit") || target.equals("type") || target.equals("pwd") || target.equals("cd")) {
                     System.out.println(target + " is a shell builtin");
                 } else {
                     String pathEnv = System.getenv("PATH");
@@ -58,6 +66,8 @@ public class Main {
             } else {
                 try {
                     ProcessBuilder pb = new ProcessBuilder(tokens);
+                    // Pass the current directory to external programs
+                    pb.directory(new File(currentDir.toString())); 
                     pb.inheritIO(); 
                     Process process = pb.start();
                     process.waitFor();
