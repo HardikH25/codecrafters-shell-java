@@ -183,6 +183,7 @@ public class Main {
                 break;
                 
             } else if (command.equals("jobs")) {
+                List<Job> toRemove = new ArrayList<>();
                 for (int i = 0; i < backgroundJobs.size(); i++) {
                     Job job = backgroundJobs.get(i);
                     char marker = ' ';
@@ -191,9 +192,23 @@ public class Main {
                     } else if (i == backgroundJobs.size() - 2) {
                         marker = '-';
                     }
-                    String output = String.format("[%d]%c  Running                 %s", job.id, marker, job.command);
-                    printOut(output, outFile, appendOut);
+                    
+                    if (job.process.isAlive()) {
+                        String output = String.format("[%d]%c  Running                 %s", job.id, marker, job.command);
+                        printOut(output, outFile, appendOut);
+                    } else {
+                        String doneCmd = job.command;
+                        if (doneCmd.endsWith(" &")) {
+                            doneCmd = doneCmd.substring(0, doneCmd.length() - 2);
+                        } else if (doneCmd.endsWith("&")) {
+                            doneCmd = doneCmd.substring(0, doneCmd.length() - 1);
+                        }
+                        String output = String.format("[%d]%c  Done                    %s", job.id, marker, doneCmd);
+                        printOut(output, outFile, appendOut);
+                        toRemove.add(job);
+                    }
                 }
+                backgroundJobs.removeAll(toRemove);
                 
             } else if (command.equals("echo")) {
                 StringBuilder echoOutput = new StringBuilder();
