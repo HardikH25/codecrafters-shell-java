@@ -25,13 +25,12 @@ public class Main {
             String[] rawTokens = parseInput(input);
             if (rawTokens.length == 0) continue;
             
-            // Allow the shell to exit cleanly
-            if (rawTokens[0].equals("exit")) {
+            if (rawTokens[0].trim().equals("exit")) {
                 System.exit(0);
             }
 
             boolean isBackground = false;
-            if (rawTokens[rawTokens.length - 1].equals("&")) {
+            if (rawTokens[rawTokens.length - 1].trim().equals("&")) {
                 isBackground = true;
                 rawTokens = Arrays.copyOf(rawTokens, rawTokens.length - 1);
             }
@@ -46,7 +45,6 @@ public class Main {
     }
 
     private static void executePipeline(List<List<String>> pipelineCommands, boolean isBackground, String fullCmd) throws Exception {
-        // Handle 2-stage pipeline with a built-in on the LEFT (e.g., echo apple | wc)
         if (pipelineCommands.size() == 2 && isBuiltin(pipelineCommands.get(0).get(0))) {
             List<String> leftCommand = pipelineCommands.get(0);
             List<String> rightCommand = pipelineCommands.get(1);
@@ -57,7 +55,6 @@ public class Main {
             pb.directory(new File(System.getProperty("user.dir")));
             Process p = pb.start();
 
-            // Write the built-in output into the next command's input
             p.getOutputStream().write(output.getBytes());
             p.getOutputStream().close();
 
@@ -66,7 +63,6 @@ public class Main {
             return;
         }
 
-        // Handle 2-stage pipeline with a built-in on the RIGHT (e.g., ls | type exit)
         if (pipelineCommands.size() == 2 && isBuiltin(pipelineCommands.get(1).get(0))) {
             List<String> leftCommand = pipelineCommands.get(0);
             List<String> rightCommand = pipelineCommands.get(1);
@@ -74,14 +70,12 @@ public class Main {
             ProcessBuilder pb = new ProcessBuilder(leftCommand);
             pb.directory(new File(System.getProperty("user.dir")));
             Process p = pb.start();
-            p.waitFor(); // Let the first command run
+            p.waitFor(); 
 
-            // Run the built-in
             executeBuiltin(rightCommand.toArray(new String[0]), null, false);
             return;
         }
 
-        // Standard multi-stage pipeline for pure external commands (3+ commands)
         List<ProcessBuilder> builders = new ArrayList<>();
         for (List<String> cmd : pipelineCommands) {
             ProcessBuilder pb = new ProcessBuilder(cmd);
@@ -90,14 +84,10 @@ public class Main {
             builders.add(pb);
         }
 
-        // Java magically links all standard inputs and outputs for the entire list!
         List<Process> processes = ProcessBuilder.startPipeline(builders);
-        
-        // Grab the very last process to print its final output to the terminal
         Process lastProcess = processes.get(processes.size() - 1);
         lastProcess.getInputStream().transferTo(System.out);
 
-        // Wait for all processes in the chain to finish
         for (Process p : processes) {
             p.waitFor();
         }
@@ -123,7 +113,6 @@ public class Main {
             try {
                 Process p = pb.start();
                 if (!isBackground) p.waitFor();
-                else { /* Background tracking logic can go here */ }
             } catch (Exception e) {
                 System.out.println(tokens.get(0) + ": command not found");
             }
@@ -131,13 +120,14 @@ public class Main {
     }
 
     public static void executeBuiltin(String[] tokens, String outFile, boolean append) {
-        String cmd = tokens[0];
+        String cmd = tokens[0].trim();
         if (cmd.equals("echo")) {
             System.out.println(String.join(" ", Arrays.copyOfRange(tokens, 1, tokens.length)));
         } else if (cmd.equals("pwd")) {
             System.out.println(Paths.get("").toAbsolutePath());
         } else if (cmd.equals("type")) {
-            String target = tokens.length > 1 ? tokens[1] : "";
+            String target = tokens.length > 1 ? tokens[1].trim() : "";
+            
             if (isBuiltin(target)) {
                 System.out.println(target + " is a shell builtin");
             } else {
@@ -170,31 +160,30 @@ public class Main {
             } else if (c == '\'' && !inDouble) inSingle = !inSingle;
             else if (c == '"' && !inSingle) inDouble = !inDouble;
             else if (Character.isWhitespace(c) && !inSingle && !inDouble) {
-                if (sb.length() > 0) { tokens.add(sb.toString()); sb.setLength(0); }
+                if (sb.length() > 0) { tokens.add(sb.toString().trim()); sb.setLength(0); }
             } else sb.append(c);
         }
-        if (sb.length() > 0) tokens.add(sb.toString());
+        if (sb.length() > 0) tokens.add(sb.toString().trim());
         return tokens.toArray(new String[0]);
     }
 
     public static void checkBackgroundJobs(boolean isJobsCommand, String outFile, boolean append) throws Exception { 
-        // Zombie reaping and 'jobs' list logic goes here
     }
     
-    // --- Added "exit" to this list! ---
     private static boolean isBuiltin(String cmd) { 
-        return Arrays.asList("echo", "type", "pwd", "cd", "jobs", "exit").contains(cmd); 
+        if (cmd == null) return false;
+        return Arrays.asList("echo", "type", "pwd", "cd", "jobs", "exit").contains(cmd.trim()); 
     }
     
     private static List<List<String>> splitByPipe(String[] tokens) {
         List<List<String>> p = new ArrayList<>(); 
         List<String> cur = new ArrayList<>();
         for(String t : tokens) { 
-            if(t.equals("|")) { 
+            if(t.trim().equals("|")) { 
                 p.add(cur); 
                 cur = new ArrayList<>(); 
             } else {
-                cur.add(t);
+                cur.add(t.trim());
             } 
         }
         p.add(cur); 
