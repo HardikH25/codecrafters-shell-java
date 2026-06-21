@@ -16,9 +16,10 @@ public class Main {
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
         while (true) {
-            checkBackgroundJobs(false, null, false);
+            checkBackgroundJobs(false);
             System.out.print("$ ");
             if (!scanner.hasNextLine()) break;
+            
             String input = scanner.nextLine().trim();
             if (input.isEmpty()) continue;
             
@@ -37,9 +38,9 @@ public class Main {
 
             List<List<String>> pipeline = splitByPipe(rawTokens);
             if (pipeline.size() > 1) {
-                executePipeline(pipeline, isBackground, String.join(" ", rawTokens));
+                executePipeline(pipeline, isBackground, input);
             } else {
-                executeSingle(pipeline.get(0), isBackground, String.join(" ", rawTokens));
+                executeSingle(pipeline.get(0), isBackground, input);
             }
         }
     }
@@ -72,7 +73,7 @@ public class Main {
             Process p = pb.start();
             p.waitFor(); 
 
-            executeBuiltin(rightCommand.toArray(new String[0]), null, false);
+            executeBuiltin(rightCommand.toArray(new String[0]));
             return;
         }
 
@@ -86,10 +87,14 @@ public class Main {
 
         List<Process> processes = ProcessBuilder.startPipeline(builders);
         Process lastProcess = processes.get(processes.size() - 1);
-        lastProcess.getInputStream().transferTo(System.out);
 
-        for (Process p : processes) {
-            p.waitFor();
+        if (!isBackground) {
+            lastProcess.getInputStream().transferTo(System.out);
+            for (Process p : processes) {
+                p.waitFor();
+            }
+        } else {
+            addBackgroundJob(lastProcess, fullCmd);
         }
     }
 
@@ -98,7 +103,7 @@ public class Main {
         PrintStream ps = new PrintStream(baos);
         PrintStream oldOut = System.out;
         System.setOut(ps);
-        executeBuiltin(tokens.toArray(new String[0]), null, false);
+        executeBuiltin(tokens.toArray(new String[0]));
         System.out.flush();
         System.setOut(oldOut);
         return baos.toString();
@@ -106,28 +111,52 @@ public class Main {
 
     private static void executeSingle(List<String> tokens, boolean isBackground, String fullCmd) throws Exception {
         if (isBuiltin(tokens.get(0))) {
-            executeBuiltin(tokens.toArray(new String[0]), null, false);
+            executeBuiltin(tokens.toArray(new String[0]));
         } else {
             ProcessBuilder pb = new ProcessBuilder(tokens);
             pb.inheritIO();
             try {
                 Process p = pb.start();
-                if (!isBackground) p.waitFor();
+                if (!isBackground) {
+                    p.waitFor();
+                } else {
+                    addBackgroundJob(p, fullCmd);
+                }
             } catch (Exception e) {
                 System.out.println(tokens.get(0) + ": command not found");
             }
         }
     }
+    
+    private static void addBackgroundJob(Process p, String fullCmd) {
+        int newJobId = 1;
+        while (true) {
+            boolean found = false;
+            for (Job j : backgroundJobs) {
+                if (j.id == newJobId) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) break; 
+            newJobId++;
+        }
+        
+        System.out.println("[" + newJobId + "] " + p.pid());
+        backgroundJobs.add(new Job(newJobId, p, fullCmd, seqCounter++));
+        backgroundJobs.sort((a, b) -> a.id - b.id);
+    }
 
-    public static void executeBuiltin(String[] tokens, String outFile, boolean append) {
+    public static void executeBuiltin(String[] tokens) {
         String cmd = tokens[0].trim();
         if (cmd.equals("echo")) {
             System.out.println(String.join(" ", Arrays.copyOfRange(tokens, 1, tokens.length)));
         } else if (cmd.equals("pwd")) {
             System.out.println(Paths.get("").toAbsolutePath());
+        } else if (cmd.equals("jobs")) {
+            checkBackgroundJobs(true);
         } else if (cmd.equals("type")) {
             String target = tokens.length > 1 ? tokens[1].trim() : "";
-            
             if (isBuiltin(target)) {
                 System.out.println(target + " is a shell builtin");
             } else {
@@ -167,7 +196,48 @@ public class Main {
         return tokens.toArray(new String[0]);
     }
 
-    public static void checkBackgroundJobs(boolean isJobsCommand, String outFile, boolean append) throws Exception { 
+    public static void checkBackgroundJobs(boolean isJobsCommand) { 
+        Job plusJob = null;
+        Job minusJob = null;
+        long maxSeq = -1;
+        long secondMaxSeq = -1;
+
+        for (Job j : backgroundJobs) {
+            if (j.launchSequence > maxSeq) {
+                secondMaxSeq = maxSeq;
+                minusJob = plusJob;
+                maxSeq = j.launchSequence;
+                plusJob = j;
+            } else if (j.launchSequence > secondMaxSeq) {
+                secondMaxSeq = j.launchSequence;
+                minusJob = j;
+            }
+        }
+
+        List<Job> toRemove = new ArrayList<>();
+        for (int i = 0; i < backgroundJobs.size(); i++) {
+            Job job = backgroundJobs.get(i);
+            char marker = ' ';
+            if (job == plusJob) marker = '+';
+            else if (job == minusJob) marker = '-';
+            
+            if (job.process.isAlive()) {
+                if (isJobsCommand) {
+                    System.out.printf("[%d]%c  Running                 %s\n", job.id, marker, job.command);
+                }
+            } else {
+                String doneCmd = job.command;
+                if (doneCmd.endsWith(" &")) {
+                    doneCmd = doneCmd.substring(0, doneCmd.length() - 2);
+                } else if (doneCmd.endsWith("&")) {
+                    doneCmd = doneCmd.substring(0, doneCmd.length() - 1);
+                }
+                
+                System.out.printf("[%d]%c  Done                    %s\n", job.id, marker, doneCmd);
+                toRemove.add(job);
+            }
+        }
+        backgroundJobs.removeAll(toRemove);
     }
     
     private static boolean isBuiltin(String cmd) { 
